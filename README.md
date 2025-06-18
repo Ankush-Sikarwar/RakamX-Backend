@@ -23,7 +23,7 @@ This is the backend server for **RAKAMX**, a modern banking and finance web appl
 - **Database:** MongoDB, Mongoose
 - **Auth:** JWT, bcrypt
 - **DevOps:** Docker
-- **Utilities:** dotenv, Helmet.js, CORS, Morgan
+- **Utilities:** dotenv
 
 ---
 
