@@ -14,10 +14,10 @@ router.post("/send-message",async(req,res) =>{
     const { name, email, phone, subject, message } = req.body;
 
     let transporter = nodemailer.createTransport({ 
-        service: "gmail", // or use SMTP details directly
+        service: "gmail", 
         auth: {
             user: process.env.GMAIL_ADDRESS,
-            pass: process.env.GMAIL_PASSWORD  // or App password if 2FA is ON
+            pass: process.env.GMAIL_PASSWORD  
         },
     });
 

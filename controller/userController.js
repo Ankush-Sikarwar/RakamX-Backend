@@ -1,16 +1,42 @@
 require('dotenv').config();
 
 
-
+const mongoose = require("mongoose")
 const {authMiddleware} = require("../middleware/authMiddleware")
 const { User} = require('../models/UserSchema')
 const {Account} = require('../models/AccountsSchema')
+const { Transaction } = require("../models/TransactionSchema");
 const bcrypt  = require('bcrypt')
 const jwt = require('jsonwebtoken');
+const crypto = require("crypto");
+const QRcode = require("qrcode")
+
+
+
+const generateUniqueAccountNumber = async () => {
+  const randomAccount = () => Math.floor(1000000000 + Math.random() * 9000000000).toString(); // 10-digit number
+
+  let exists = true;
+  let accountNumber;
+
+  while (exists) {
+    accountNumber = randomAccount();
+    const existing = await Account.findOne({ accountNumber });
+    if (!existing) exists = false;
+  }
+
+  return accountNumber;
+};
+
+
+
+
+
 
 
 const createUser = async (req,res) =>{
-    const {username,password,firstname,lastname ,email} = req.body;
+    const {username, password, firstname, lastname ,email} = req.body;
+    const normalizedEmail = email.toLowerCase();
     
 
     try{
@@ -19,7 +45,7 @@ const createUser = async (req,res) =>{
         const hashedPassword  = await bcrypt.hash(password,salt);
 
         const user = await User.create({
-            email,
+            email: normalizedEmail,
             username,
             password: hashedPassword,
             firstname,
@@ -35,15 +61,25 @@ const createUser = async (req,res) =>{
                 msg: "something went wrong"
             })
         }
+
         const min = 10;
         const max = 100000;
         const generatedBalance = Math.floor((Math.random() * (max - min)) + min )
+        const generatedAccountNumber =   await generateUniqueAccountNumber();
+        const upiId = `${user.username.toLowerCase()}@rakamx`;
+        const qrCodeBase64 = await QRcode.toDataURL(generatedAccountNumber);
 
-        const userBalance = await Account.create({
+
+        const AccountDetails = await Account.create({
             userId: user._id,
-            balance: generatedBalance
+            balance: generatedBalance,
+            accountnumber: generatedAccountNumber,
+            qrcode: qrCodeBase64,
+            upiid: upiId
+
+
         })
-        userBalance.save();
+        await AccountDetails.save();
 
 
 
@@ -59,20 +95,23 @@ const createUser = async (req,res) =>{
 const signin = async (req,res) =>{
 
     try{
-        const {email,password} = req.body;
+        
+        const {email, password} = req.body;
+        const normalizedEmail = email.toLowerCase();
+        // console.log(normalizedEmail)
 
         
-        const user = await User.findOne({email});
+        const user = await User.findOne({email: normalizedEmail});
         if(!user){
-            res.status(404).json({
+            return res.status(404).json({
                 message: " user not found"
             })
         }
 
-        const checkPassword = bcrypt.compare(password , user.password)
+        const checkPassword = await bcrypt.compare(password , user.password)
 
         if(!checkPassword) {
-            res.status(404).json({
+            return res.status(404).json({
                 message: " Invalid password"
             })
         }
@@ -85,20 +124,23 @@ const signin = async (req,res) =>{
 
         const key = process.env.JWT_SECRET;
 
-        const token = jwt.sign(payload,key);
+        const token = jwt.sign(payload,key, { expiresIn: "1h" } );
+        console.log(token)
  
-        res.cookie('token',{
+        res.cookie('token',token,{
             httpOnly: true,
-            sameSite: 'Strict',
+            secure:false,
+            sameSite: 'Lax',
             maxAge: 3600000
 
 
         });
+        console.log("cookie sent")
 
 
         res.status(200).json({
             message : "Login successful",
-            token: `Bearer ${token}`
+            
         })
         
 
@@ -130,17 +172,45 @@ const updateuser =  async(req, res) =>{
             new: true
         }
     )
-
-
-
     res.json({
         message:"user updated"
     })
-
-
 
 }
 
 
 
-module.exports = {createUser, signin, updateuser};
+
+
+const getTransactions = async (req, res) => {
+
+    try {
+    const userId = req.user.id;
+
+    const transactions = await Transaction.find({
+        $or:[{sender: userId }, {receiver: userId}]
+    })
+    .sort({ createdAt: -1 }) 
+    .populate("sender", "username email")
+    .populate("receiver", "username email");
+
+     res.status(200).json({
+      message: "Transaction history fetched",
+      data: transactions
+    });
+  } catch (e) {
+    res.status(500).json({
+      message: "Error fetching transactions",
+      error: e.message
+    });
+  }
+ 
+};
+
+
+
+
+
+
+
+module.exports = {createUser, signin, updateuser , getTransactions};
