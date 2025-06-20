@@ -8,6 +8,23 @@ const AccountSchema = new mongoose.Schema({
         required:true
         
     },
+    accountnumber:{
+        type: Number,
+        required: true,
+        unique: true
+    },
+    IFSCnumber:{
+        type: String,
+        default: "RAKAMX21291909"
+    },
+    qrcode:{
+        type: String
+
+    },
+    upiid:{
+        type: String,
+        unique: true
+    },
     balance: {
         type: Number,
         required: true
